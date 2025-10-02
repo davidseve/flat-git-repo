@@ -1,5 +1,7 @@
 import os
 import shutil
+import subprocess
+import tempfile
 
 # --- CONFIGURATION ---
 # Default paths (can be overridden with command line parameters)
@@ -9,6 +11,9 @@ ruta_origen_default = "/home/dseveria/hack/ocp-gitops-architecture"
 
 # Path to the empty folder you created to save all files.
 ruta_destino_default = "/home/dseveria/hack/ocp-gitops-architecture-flat"
+
+# Git repository URL (optional)
+git_repo_default = None
 
 # Allowed file extensions
 EXTENSIONES_PERMITIDAS = {
@@ -48,7 +53,7 @@ def es_archivo_excluido(extension):
     """
     Checks if the file extension should be excluded from processing.
     """
-    extensiones_excluidas = {'ttf', 'otf', 'woff', 'woff2', 'eot'}  # Fonts
+    extensiones_excluidas = {'ttf', 'otf', 'woff', 'woff2', 'eot', 'jar', 'war', 'zip', 'tar', 'gz', 'bz2', 'rar', '7z'}  # Fonts
     return extension.lower().lstrip('.') in extensiones_excluidas
 
 
@@ -154,6 +159,76 @@ def verificar_palabras_archivo(ruta_archivo):
         return False
     
     return True
+
+
+def clonar_repositorio_git(git_url, directorio_destino):
+    """
+    Clones a Git repository to the specified directory.
+    Uses GitLab PAT from environment variable if available.
+    """
+    try:
+        # Check if GitLab PAT is available
+        gitlab_pat = os.environ.get('GITLAB_PAT')
+        
+        if gitlab_pat:
+            print(f"Using GitLab PAT for authentication")
+            # Modify URL to include PAT for authentication
+            if 'gitlab.com' in git_url or '@' in git_url:
+                # Handle different GitLab URL formats
+                if git_url.startswith('https://'):
+                    # Replace https:// with https://oauth2:TOKEN@
+                    git_url_auth = git_url.replace('https://', f'https://oauth2:{gitlab_pat}@')
+                elif git_url.startswith('git@'):
+                    # For SSH URLs, we'll use HTTPS with PAT instead
+                    git_url_auth = git_url.replace('git@gitlab.com:', f'https://oauth2:{gitlab_pat}@gitlab.com/')
+                else:
+                    git_url_auth = git_url
+            else:
+                git_url_auth = git_url
+        else:
+            print(f"Warning: GITLAB_PAT environment variable not set. Using public access.")
+            git_url_auth = git_url
+        
+        print(f"Cloning repository: {git_url}")
+        print(f"Destination: {directorio_destino}")
+        
+        # Clone the repository
+        result = subprocess.run([
+            'git', 'clone', '--depth', '1', git_url_auth, directorio_destino
+        ], capture_output=True, text=True, timeout=300)
+        
+        if result.returncode == 0:
+            print(f"Repository cloned successfully to: {directorio_destino}")
+            return True
+        else:
+            print(f"Error cloning repository:")
+            print(f"STDOUT: {result.stdout}")
+            print(f"STDERR: {result.stderr}")
+            return False
+            
+    except subprocess.TimeoutExpired:
+        print(f"Error: Git clone operation timed out")
+        return False
+    except Exception as e:
+        print(f"Error cloning repository: {e}")
+        return False
+
+
+def verificar_git_disponible():
+    """
+    Checks if Git is available in the system.
+    """
+    try:
+        result = subprocess.run(['git', '--version'], capture_output=True, text=True)
+        if result.returncode == 0:
+            print(f"Git available: {result.stdout.strip()}")
+            return True
+        else:
+            print("Error: Git is not available in the system")
+            return False
+    except FileNotFoundError:
+        print("Error: Git is not installed or not in PATH")
+        return False
 
 
 def eliminar_archivos_vacios(directorio):
@@ -489,15 +564,17 @@ def mostrar_ayuda():
 Flatten Directory - File Reorganization Script
 
 USAGE:
-    python aplanar_directorio.py [OPTIONS] [SOURCE] [DESTINATION]
+    python aplanar_directorio.py [OPTIONS] [SOURCE] [DESTINATION] [GIT_REPO]
 
 OPTIONS:
     -h, --help              Show this help
     --eliminar-vacios       Only remove empty files from destination directory
+    --git-clone             Clone Git repository before processing
 
 PARAMETERS:
     SOURCE                  Path to source directory (optional, uses default value if not specified)
     DESTINATION             Path to destination directory (optional, uses default value if not specified)
+    GIT_REPO                Git repository URL (optional, requires --git-clone option)
 
 EXAMPLES:
     # Use default paths
@@ -509,17 +586,30 @@ EXAMPLES:
     # Specify source and destination
     python aplanar_directorio.py /path/source /path/destination
     
+    # Clone Git repository and process it
+    python aplanar_directorio.py --git-clone https://gitlab.com/user/repo.git /path/destination
+    
+    # Clone Git repository with custom source name
+    python aplanar_directorio.py --git-clone https://gitlab.com/user/repo.git /path/source /path/destination
+    
     # Only remove empty files
     python aplanar_directorio.py --eliminar-vacios /path/destination
     
     # Show help
     python aplanar_directorio.py --help
 
+GIT INTEGRATION:
+    - Set GITLAB_PAT environment variable for GitLab authentication
+    - Supports both HTTPS and SSH Git URLs
+    - Uses shallow clone (--depth 1) for faster cloning
+    - Automatically handles GitLab PAT authentication
+
 NOTES:
     - If SOURCE is not specified, uses: {ruta_origen_default}
     - If DESTINATION is not specified, uses: {ruta_destino_default}
     - Source and destination paths must be different
     - The destination directory will be created automatically if it doesn't exist
+    - Git repository will be cloned to a temporary directory when using --git-clone
     """.format(
         ruta_origen_default=ruta_origen_default,
         ruta_destino_default=ruta_destino_default
@@ -535,8 +625,10 @@ def parsear_argumentos():
     # Default values
     origen = ruta_origen_default
     destino = ruta_destino_default
+    git_repo = git_repo_default
     solo_eliminar_vacios = False
     directorio_eliminar_vacios = None
+    usar_git_clone = False
     
     # Counter to track how many path parameters we have processed
     parametros_ruta = 0
@@ -557,9 +649,15 @@ def parsear_argumentos():
                 i += 1
             else:
                 directorio_eliminar_vacios = destino
+        elif arg == '--git-clone':
+            usar_git_clone = True
         elif not arg.startswith('-'):
             # It's a path parameter
-            if parametros_ruta == 0:
+            if usar_git_clone and parametros_ruta == 0:
+                # First parameter after --git-clone is the Git repository URL
+                git_repo = arg
+                parametros_ruta += 1
+            elif parametros_ruta == 0:
                 origen = arg
                 parametros_ruta += 1
             elif parametros_ruta == 1:
@@ -576,7 +674,7 @@ def parsear_argumentos():
         
         i += 1
     
-    return origen, destino, solo_eliminar_vacios, directorio_eliminar_vacios
+    return origen, destino, git_repo, solo_eliminar_vacios, directorio_eliminar_vacios, usar_git_clone
 
 
 # --- Execute the function ---
@@ -584,7 +682,7 @@ if __name__ == "__main__":
     import sys
     
     # Parse command line arguments
-    ruta_origen, ruta_destino, solo_eliminar_vacios, directorio_eliminar_vacios = parsear_argumentos()
+    ruta_origen, ruta_destino, git_repo, solo_eliminar_vacios, directorio_eliminar_vacios, usar_git_clone = parsear_argumentos()
     
     # Check if we only want to remove empty files
     if solo_eliminar_vacios:
@@ -595,10 +693,43 @@ if __name__ == "__main__":
         else:
             print(f"Error: The destination path '{directorio_a_limpiar}' does not exist.")
     else:
+        # Handle Git clone functionality
+        if usar_git_clone:
+            if not git_repo:
+                print("Error: --git-clone option requires a Git repository URL")
+                print("Use --help to see help.")
+                sys.exit(1)
+            
+            # Check if Git is available
+            if not verificar_git_disponible():
+                print("Error: Git is required for --git-clone functionality")
+                sys.exit(1)
+            
+            # Create temporary directory for Git clone
+            temp_dir = tempfile.mkdtemp(prefix="git_clone_")
+            print(f"Using temporary directory for Git clone: {temp_dir}")
+            
+            # Clone the repository
+            if clonar_repositorio_git(git_repo, temp_dir):
+                # Use the cloned repository as source
+                ruta_origen = temp_dir
+                print(f"Git repository cloned successfully. Processing from: {ruta_origen}")
+            else:
+                print("Error: Failed to clone Git repository")
+                # Clean up temporary directory
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                sys.exit(1)
+        
         # Basic validations for normal process
         if not os.path.isdir(ruta_origen):
             print(f"Error: The source path '{ruta_origen}' does not exist or is not a directory.")
         elif ruta_origen == ruta_destino:
              print("Error: Source and destination paths cannot be the same.")
         else:
-            aplanar_directorio(ruta_origen, ruta_destino)
+            try:
+                aplanar_directorio(ruta_origen, ruta_destino)
+            finally:
+                # Clean up temporary directory if we used Git clone
+                if usar_git_clone and 'temp_dir' in locals():
+                    print(f"Cleaning up temporary directory: {temp_dir}")
+                    shutil.rmtree(temp_dir, ignore_errors=True)

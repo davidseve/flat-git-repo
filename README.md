@@ -17,6 +17,7 @@ The script is designed to:
 - Python 3.6 or higher
 - Read permissions on the source directory
 - Write permissions on the destination directory
+- Git (optional, required for `--git-clone` functionality)
 
 ## ⚙️ Configuration
 
@@ -54,18 +55,20 @@ MAX_IMAGENES_PER_FOLDER = 10    # Maximum images per folder
 ### Command Line Syntax
 
 ```bash
-python aplanar_directorio.py [OPTIONS] [SOURCE] [DESTINATION]
+python aplanar_directorio.py [OPTIONS] [SOURCE] [DESTINATION] [GIT_REPO]
 ```
 
 ### Options
 
 - `-h, --help` - Show help information
 - `--eliminar-vacios` - Only remove empty files from destination directory
+- `--git-clone` - Clone Git repository before processing
 
 ### Parameters
 
 - `SOURCE` - Path to source directory (optional, uses default if not specified)
 - `DESTINATION` - Path to destination directory (optional, uses default if not specified)
+- `GIT_REPO` - Git repository URL (optional, requires `--git-clone` option)
 
 ### Usage Examples
 
@@ -84,6 +87,16 @@ python aplanar_directorio.py /path/to/source
 python aplanar_directorio.py /path/to/source /path/to/destination
 ```
 
+#### Clone Git Repository and Process
+```bash
+python aplanar_directorio.py --git-clone https://gitlab.com/user/repo.git /path/to/destination
+```
+
+#### Clone Git Repository with Custom Source Name
+```bash
+python aplanar_directorio.py --git-clone https://gitlab.com/user/repo.git /path/to/source /path/to/destination
+```
+
 #### Remove Only Empty Files
 ```bash
 python aplanar_directorio.py --eliminar-vacios /path/to/destination
@@ -100,6 +113,7 @@ python aplanar_directorio.py --help
 - If DESTINATION is not specified, the default path is used
 - Source and destination paths must be different
 - The destination directory will be created automatically if it doesn't exist
+- Git repository will be cloned to a temporary directory when using `--git-clone`
 
 ## 📁 Output Structure
 
@@ -155,6 +169,38 @@ The following file types are automatically excluded:
 - If a file with the same name exists, a numeric suffix is added (`_1`, `_2`, etc.)
 - Each detected conflict is reported
 
+## 🔗 Git Integration
+
+### GitLab Authentication
+
+The script supports GitLab Personal Access Token (PAT) authentication through environment variables:
+
+```bash
+# Set your GitLab PAT
+export GITLAB_PAT="your_gitlab_personal_access_token"
+
+# Now you can clone private repositories
+python aplanar_directorio.py --git-clone https://gitlab.com/user/private-repo.git /path/destination
+```
+
+### Supported Git URL Formats
+
+- **HTTPS URLs**: `https://gitlab.com/user/repo.git`
+- **SSH URLs**: `git@gitlab.com:user/repo.git` (automatically converted to HTTPS with PAT)
+
+### Git Features
+
+- **Shallow Clone**: Uses `--depth 1` for faster cloning (only latest commit)
+- **Automatic Authentication**: Handles GitLab PAT authentication automatically
+- **Temporary Storage**: Clones to temporary directory and cleans up after processing
+- **Error Handling**: Comprehensive error handling for Git operations
+
+### Git Requirements
+
+- Git must be installed and available in PATH
+- For private repositories, set `GITLAB_PAT` environment variable
+- Network access to the Git repository
+
 ## 📊 Progress Information
 
 The script provides detailed information during execution:
@@ -201,6 +247,12 @@ Total image folders created: 5
 - Check the configured size and word limits
 - Review error messages in the script output
 
+### Git-related errors
+- **"Git is not available"**: Install Git and ensure it's in your PATH
+- **"Failed to clone repository"**: Check repository URL and network connectivity
+- **"Authentication failed"**: Verify your GitLab PAT is set correctly
+- **"Repository not found"**: Check if the repository exists and you have access
+
 ## 📝 Configuration Examples
 
 ### Command Line Usage Examples
@@ -211,6 +263,13 @@ python aplanar_directorio.py /home/user/my-project /home/user/my-project-flat
 
 # Process with only source specified (uses default destination)
 python aplanar_directorio.py /home/user/my-project
+
+# Clone and process a Git repository
+python aplanar_directorio.py --git-clone https://gitlab.com/user/repo.git /home/user/repo-flat
+
+# Clone private repository with GitLab PAT
+export GITLAB_PAT="your_token_here"
+python aplanar_directorio.py --git-clone https://gitlab.com/user/private-repo.git /home/user/private-repo-flat
 
 # Clean empty files from a specific directory
 python aplanar_directorio.py --eliminar-vacios /home/user/my-project-flat
