@@ -1,32 +1,29 @@
 import os
 import shutil
 
-# --- CONFIGURACIÓN ---
-# ¡IMPORTANTE! Cambia estas dos rutas por las tuyas.
+# --- CONFIGURATION ---
+# Default paths (can be overridden with command line parameters)
 
-# Ruta a la carpeta de tu proyecto original (la que tiene muchas subcarpetas).
-# ruta_origen = "/home/dseveria/hack/titan-on-ocp-poc"
-ruta_origen = "/home/dseveria/hack/ocp-gitops-architecture"
+# Path to your original project folder (the one with many subfolders).
+ruta_origen_default = "/home/dseveria/hack/ocp-gitops-architecture"
 
+# Path to the empty folder you created to save all files.
+ruta_destino_default = "/home/dseveria/hack/ocp-gitops-architecture-flat"
 
-# Ruta a la carpeta vacía que creaste para guardar todos los archivos.
-# ruta_destino = "/home/dseveria/hack/titan-on-ocp-poc-flat"
-ruta_destino = "/home/dseveria/hack/ocp-gitops-architecture-flat"
-
-# Extensiones de archivo permitidas
+# Allowed file extensions
 EXTENSIONES_PERMITIDAS = {
     'pdf', 'txt', 'md', '3g2', '3gp', 'aac', 'aif', 'aifc', 'aiff', 'amr', 
     'au', 'avi', 'cda', 'm4a', 'mid', 'mp3', 'mp4', 'mpeg', 'ogg', 'opus', 
     'ra', 'ram', 'snd', 'wav', 'wma'
 }
 
-# Límites de control
-MAX_FILE_SIZE_MB = 200  # Tamaño máximo por archivo en MB
-MAX_WORDS_PER_FILE = 500000  # Máximo de palabras por archivo
-MAX_FILES_PER_FOLDER = 300  # Máximo de archivos por carpeta
-MAX_IMAGENES_PER_FOLDER = 10  # Máximo de imágenes por carpeta
+# Control limits
+MAX_FILE_SIZE_MB = 200  # Maximum size per file in MB
+MAX_WORDS_PER_FILE = 500000  # Maximum words per file
+MAX_FILES_PER_FOLDER = 300  # Maximum files per folder
+MAX_IMAGENES_PER_FOLDER = 10  # Maximum images per folder
 
-# Extensiones de imágenes que se copiarán a carpeta separada
+# Image extensions that will be copied to separate folder
 EXTENSIONES_IMAGENES = {
     'png', 'jpg', 'jpeg', 'gif', 'bmp', 'svg', 'ico', 'tiff', 'webp', 'tga', 'psd', 'ai', 'eps', 'xcf', 'graphml'
 }
@@ -35,33 +32,33 @@ EXTENSIONES_IMAGENES = {
 
 def es_extension_permitida(extension):
     """
-    Verifica si la extensión del archivo está en la lista de extensiones permitidas.
+    Checks if the file extension is in the list of allowed extensions.
     """
     return extension.lower().lstrip('.') in EXTENSIONES_PERMITIDAS
 
 
 def es_imagen(extension):
     """
-    Verifica si la extensión del archivo corresponde a una imagen.
+    Checks if the file extension corresponds to an image.
     """
     return extension.lower().lstrip('.') in EXTENSIONES_IMAGENES
 
 
 def es_archivo_excluido(extension):
     """
-    Verifica si la extensión del archivo debe ser excluida del procesamiento.
+    Checks if the file extension should be excluded from processing.
     """
-    extensiones_excluidas = {'ttf', 'otf', 'woff', 'woff2', 'eot'}  # Fuentes
+    extensiones_excluidas = {'ttf', 'otf', 'woff', 'woff2', 'eot'}  # Fonts
     return extension.lower().lstrip('.') in extensiones_excluidas
 
 
 def limpiar_shebang_shell(ruta_archivo):
     """
-    Lee un archivo shell script y elimina la línea del shebang (#!/bin/bash, #!/bin/sh, etc.)
-    Retorna el contenido limpio o None si hay error.
+    Reads a shell script file and removes the shebang line (#!/bin/bash, #!/bin/sh, etc.)
+    Returns the clean content or None if there's an error.
     """
     try:
-        # Intentar leer con diferentes encodings
+        # Try to read with different encodings
         encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
         
         for encoding in encodings:
@@ -69,11 +66,11 @@ def limpiar_shebang_shell(ruta_archivo):
                 with open(ruta_archivo, 'r', encoding=encoding) as archivo:
                     lineas = archivo.readlines()
                 
-                # Filtrar líneas que empiecen con #!/ (shebang)
+                # Filter lines that start with #!/ (shebang)
                 lineas_limpias = []
                 for linea in lineas:
                     linea_stripped = linea.strip()
-                    # Eliminar cualquier línea que empiece con #!/
+                    # Remove any line that starts with #!/
                     if not linea_stripped.startswith('#!/'):
                         lineas_limpias.append(linea)
                 
@@ -82,7 +79,7 @@ def limpiar_shebang_shell(ruta_archivo):
             except UnicodeDecodeError:
                 continue
         
-        # Si no se puede leer como texto, retornar None
+        # If it cannot be read as text, return None
         return None
         
     except Exception as e:
@@ -94,12 +91,12 @@ def limpiar_shebang_shell(ruta_archivo):
 
 def verificar_tamaño_archivo(ruta_archivo):
     """
-    Verifica si el archivo no supera el tamaño máximo permitido.
-    Retorna True si el archivo es válido, False si es demasiado grande.
+    Checks if the file does not exceed the maximum allowed size.
+    Returns True if the file is valid, False if it's too large.
     """
     try:
         tamaño_bytes = os.path.getsize(ruta_archivo)
-        tamaño_mb = tamaño_bytes / (1024 * 1024)  # Convertir a MB
+        tamaño_mb = tamaño_bytes / (1024 * 1024)  # Convert to MB
         
         if tamaño_mb > MAX_FILE_SIZE_MB:
             print(f"  !! Archivo demasiado grande ({tamaño_mb:.2f} MB > {MAX_FILE_SIZE_MB} MB): {ruta_archivo}")
@@ -112,28 +109,28 @@ def verificar_tamaño_archivo(ruta_archivo):
 
 def contar_palabras_archivo(ruta_archivo):
     """
-    Cuenta las palabras en un archivo de texto.
-    Retorna el número de palabras o -1 si hay error.
+    Counts words in a text file.
+    Returns the number of words or -1 if there's an error.
     """
     try:
-        # Intentar leer como texto con diferentes encodings
+        # Try to read as text with different encodings
         encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
         
         for encoding in encodings:
             try:
                 with open(ruta_archivo, 'r', encoding=encoding) as archivo:
                     contenido = archivo.read()
-                    # Contar palabras separadas por espacios, saltos de línea, etc.
+                    # Count words separated by spaces, line breaks, etc.
                     palabras = len(contenido.split())
                     return palabras
             except UnicodeDecodeError:
                 continue
         
-        # Si no se puede leer como texto, asumir que es binario y contar bytes
+        # If it cannot be read as text, assume it's binary and count bytes
         with open(ruta_archivo, 'rb') as archivo:
             contenido = archivo.read()
-            # Para archivos binarios, estimar palabras basándose en el tamaño
-            # Asumiendo ~5 caracteres por palabra en promedio
+            # For binary files, estimate words based on size
+            # Assuming ~5 characters per word on average
             palabras_estimadas = len(contenido) // 5
             return palabras_estimadas
             
@@ -144,12 +141,12 @@ def contar_palabras_archivo(ruta_archivo):
 
 def verificar_palabras_archivo(ruta_archivo):
     """
-    Verifica si el archivo no supera el límite de palabras.
-    Retorna True si el archivo es válido, False si tiene demasiadas palabras.
+    Checks if the file does not exceed the word limit.
+    Returns True if the file is valid, False if it has too many words.
     """
     palabras = contar_palabras_archivo(ruta_archivo)
     
-    if palabras == -1:  # Error al leer el archivo
+    if palabras == -1:  # Error reading the file
         return False
     
     if palabras > MAX_WORDS_PER_FILE:
@@ -161,11 +158,11 @@ def verificar_palabras_archivo(ruta_archivo):
 
 def eliminar_archivos_vacios(directorio):
     """
-    Elimina todos los archivos vacíos (0 bytes) del directorio especificado.
+    Removes all empty files (0 bytes) from the specified directory.
     """
     archivos_eliminados = 0
     
-    print(f"\nBuscando archivos vacíos en: {directorio}")
+    print(f"\nSearching for empty files in: {directorio}")
     
     for dirpath, _, filenames in os.walk(directorio):
         for filename in filenames:
@@ -174,33 +171,33 @@ def eliminar_archivos_vacios(directorio):
             try:
                 # Verificar si el archivo está vacío
                 if os.path.getsize(ruta_archivo) == 0:
-                    print(f"  -> Eliminando archivo vacío: {ruta_archivo}")
+                    print(f"  -> Removing empty file: {ruta_archivo}")
                     os.remove(ruta_archivo)
                     archivos_eliminados += 1
             except Exception as e:
                 print(f"  !! Error al procesar {ruta_archivo}: {e}")
     
-    print(f"Total de archivos vacíos eliminados: {archivos_eliminados}")
+    print(f"Total empty files removed: {archivos_eliminados}")
     return archivos_eliminados
 
 
 def convertir_extension_a_txt(filename):
     """
-    Convierte la extensión de un archivo a una extensión válida similar al tipo original.
-    Muestra el tipo original y la transformación aplicada.
+    Converts a file extension to a valid extension similar to the original type.
+    Shows the original type and the transformation applied.
     """
     nombre_base, extension = os.path.splitext(filename)
     extension_lower = extension.lower()
     
-    # Si no tiene extensión, agregar .txt
+    # If it has no extension, add .txt
     if not extension:
         nuevo_nombre = f"{nombre_base}.txt"
-        print(f"  -> Agregando extensión: sin extensión → '.txt' (archivo: {filename})")
+        print(f"  -> Adding extension: no extension → '.txt' (file: {filename})")
         return nuevo_nombre
     
-    # Mapeo de extensiones a extensiones válidas más similares
+    # Mapping of extensions to more similar valid extensions
     mapeo_extensiones = {
-        # Scripts y código
+        # Scripts and code
         '.sh': '.md',           # Shell scripts → Markdown
         '.bash': '.md',         # Bash scripts → Markdown
         '.zsh': '.md',          # Zsh scripts → Markdown
@@ -223,7 +220,7 @@ def convertir_extension_a_txt(filename):
         '.r': '.txt',           # R → Texto
         '.m': '.txt',           # MATLAB/Objective-C → Texto
         
-        # Configuración y datos
+        # Configuration and data
         '.yaml': '.txt',        # YAML → Texto
         '.yml': '.txt',         # YAML → Texto
         '.json': '.txt',        # JSON → Texto
@@ -237,24 +234,24 @@ def convertir_extension_a_txt(filename):
         '.csv': '.txt',         # CSV → Texto
         '.tsv': '.txt',         # TSV → Texto
         
-        # Documentación
+        # Documentation
         '.adoc': '.txt',        # AsciiDoc → Texto
         '.rst': '.txt',         # reStructuredText → Texto
         '.tex': '.txt',         # LaTeX → Texto
         '.org': '.txt',         # Org mode → Texto
         
-        # Templates y otros
+        # Templates and others
         '.template': '.txt',    # Template → Texto
         '.tpl': '.txt',         # Template → Texto
         '.mustache': '.txt',    # Mustache → Texto
         '.hbs': '.txt',         # Handlebars → Texto
         '.ejs': '.txt',         # EJS → Texto
         
-        # Docker y contenedores
+        # Docker and containers
         '.dockerfile': '.txt',  # Dockerfile → Texto
         '.dockerignore': '.txt', # Docker ignore → Texto
         
-        # Otros archivos de texto
+        # Other text files
         '.log': '.txt',         # Log files → Texto
         '.sql': '.txt',         # SQL → Texto
         '.diff': '.txt',        # Diff → Texto
@@ -262,22 +259,22 @@ def convertir_extension_a_txt(filename):
         '.gitignore': '.txt',   # Git ignore → Texto
         '.gitattributes': '.txt', # Git attributes → Texto
         
-        # Las imágenes se manejan por separado, no se incluyen aquí
+        # Images are handled separately, not included here
         
-        # Diagramas y diseño
+        # Diagrams and design
         '.excalidraw': '.txt',  # Excalidraw → Texto
         '.drawio': '.txt',      # Draw.io → Texto
         '.vsdx': '.txt',        # Visio → Texto
         '.dwg': '.txt',         # AutoCAD → Texto
         
-        # Archivos comprimidos (convertir a texto descriptivo)
+        # Compressed files (convert to descriptive text)
         '.zip': '.txt',         # ZIP → Texto
         '.tar': '.txt',         # TAR → Texto
         '.gz': '.txt',          # GZIP → Texto
         '.rar': '.txt',         # RAR → Texto
         '.7z': '.txt',          # 7-Zip → Texto
         
-        # Binarios (convertir a texto descriptivo)
+        # Binaries (convert to descriptive text)
         '.exe': '.txt',         # Executable → Texto
         '.dll': '.txt',         # DLL → Texto
         '.so': '.txt',          # Shared Object → Texto
@@ -285,102 +282,102 @@ def convertir_extension_a_txt(filename):
         '.bin': '.txt',         # Binary → Texto
     }
     
-    # Si la extensión está permitida, no hacer nada
+    # If the extension is allowed, do nothing
     if es_extension_permitida(extension):
         return filename
     
-    # Buscar en el mapeo
+    # Search in the mapping
     if extension_lower in mapeo_extensiones:
         nueva_extension = mapeo_extensiones[extension_lower]
         nuevo_nombre = f"{nombre_base}{nueva_extension}"
-        print(f"  -> Conversión de extensión: '{extension}' → '{nueva_extension}' (archivo: {filename})")
+        print(f"  -> Extension conversion: '{extension}' → '{nueva_extension}' (file: {filename})")
         return nuevo_nombre
     
-    # Si no está en el mapeo, usar .txt como fallback
+    # If not in the mapping, use .txt as fallback
     nuevo_nombre = f"{nombre_base}.txt"
-    print(f"  -> Conversión de extensión: '{extension}' → '.txt' (fallback, archivo: {filename})")
+    print(f"  -> Extension conversion: '{extension}' → '.txt' (fallback, file: {filename})")
     return nuevo_nombre
 
 
 def aplanar_directorio(origen, destino):
     """
-    Copia todos los archivos de un directorio de origen y sus subdirectorios
-    a directorios de destino, manejando conflictos de nombres y controles de tamaño.
+    Copies all files from a source directory and its subdirectories
+    to destination directories, handling name conflicts and size controls.
     """
-    # 1. Asegurarse de que la carpeta de destino base existe.
+    # 1. Make sure the base destination folder exists.
     if not os.path.exists(destino):
-        print(f"Creando directorio de destino: {destino}")
+        print(f"Creating destination directory: {destino}")
         os.makedirs(destino)
 
-    print(f"Buscando archivos en: {origen}")
-    print(f"Copiando archivos a: {destino}")
-    print(f"Límites: {MAX_FILE_SIZE_MB} MB por archivo, {MAX_WORDS_PER_FILE:,} palabras por archivo, {MAX_FILES_PER_FOLDER} archivos por carpeta\n")
+    print(f"Searching files in: {origen}")
+    print(f"Copying files to: {destino}")
+    print(f"Limits: {MAX_FILE_SIZE_MB} MB per file, {MAX_WORDS_PER_FILE:,} words per file, {MAX_FILES_PER_FOLDER} files per folder\n")
 
-    # Contadores para control de múltiples carpetas
+    # Counters for multiple folder control
     archivos_copiados = 0
     imagenes_copiadas = 0
     carpeta_actual = 1
     carpeta_imagenes_actual = 1
     directorio_destino_actual = destino
     
-    # Crear la primera carpeta si es necesario
+    # Create the first folder if necessary
     if not os.path.exists(directorio_destino_actual):
-        print(f"Creando carpeta inicial: {directorio_destino_actual}")
+        print(f"Creating initial folder: {directorio_destino_actual}")
         os.makedirs(directorio_destino_actual)
     
-    # Crear primera carpeta para imágenes
+    # Create first folder for images
     directorio_imagenes_actual = os.path.join(destino, f"imagenes_{carpeta_imagenes_actual}")
     if not os.path.exists(directorio_imagenes_actual):
-        print(f"Creando carpeta para imágenes: {directorio_imagenes_actual}")
+        print(f"Creating folder for images: {directorio_imagenes_actual}")
         os.makedirs(directorio_imagenes_actual)
     
-    # 2. Recorrer cada carpeta, subcarpeta y archivo en el origen.
+    # 2. Traverse each folder, subfolder and file in the source.
     for dirpath, _, filenames in os.walk(origen):
-        # Ignorar el directorio .git por completo
+        # Ignore the .git directory completely
         if ".git" in dirpath.split(os.sep):
             continue
             
         for filename in filenames:
-            # Construir la ruta completa del archivo original
+            # Build the complete path of the original file
             ruta_archivo_original = os.path.join(dirpath, filename)
             
-            # Obtener la extensión del archivo
+            # Get the file extension
             _, extension = os.path.splitext(filename)
             
-            # 3. Verificar si el archivo debe ser excluido
+            # 3. Check if the file should be excluded
             if es_archivo_excluido(extension):
-                print(f"  -> Archivo excluido (extensión {extension}): {filename}")
+                print(f"  -> Excluded file (extension {extension}): {filename}")
                 continue
             
-            # 4. Verificar tamaño del archivo
+            # 4. Check file size
             if not verificar_tamaño_archivo(ruta_archivo_original):
                 continue
             
-            # 4.5. Si no tiene extensión, verificar que tenga contenido antes de agregar .txt
+            # 4.5. If it has no extension, check that it has content before adding .txt
             if not extension:
                 try:
-                    # Verificar si el archivo tiene contenido (no está vacío)
+                    # Check if the file has content (is not empty)
                     if os.path.getsize(ruta_archivo_original) == 0:
-                        print(f"  -> Archivo sin extensión y vacío, omitiendo: {filename}")
+                        print(f"  -> File without extension and empty, skipping: {filename}")
                         continue
                 except Exception as e:
                     print(f"  !! Error al verificar archivo sin extensión {ruta_archivo_original}: {e}")
                     continue
             
-            # 5. Verificar si es una imagen
+            # 5. Check if it's an image
             if es_imagen(extension):
-                # Crear nueva carpeta de imágenes si se alcanzó el límite
+                # Create new image folder if limit is reached
                 if imagenes_copiadas > 0 and imagenes_copiadas % MAX_IMAGENES_PER_FOLDER == 0:
                     carpeta_imagenes_actual += 1
                     directorio_imagenes_actual = os.path.join(destino, f"imagenes_{carpeta_imagenes_actual}")
                     if not os.path.exists(directorio_imagenes_actual):
-                        print(f"Creando nueva carpeta de imágenes: {directorio_imagenes_actual}")
+                        print(f"Creating new image folder: {directorio_imagenes_actual}")
                         os.makedirs(directorio_imagenes_actual)
                 
-                # Manejar imágenes por separado
+                # Handle images separately
                 ruta_imagen_destino = os.path.join(directorio_imagenes_actual, filename)
                 
-                # Manejo de conflictos para imágenes
+                # Conflict handling for images
                 contador = 1
                 nombre_base, ext = os.path.splitext(filename)
                 
@@ -391,22 +388,22 @@ def aplanar_directorio(origen, destino):
                 
                 try:
                     if ruta_imagen_destino != os.path.join(directorio_imagenes_actual, filename):
-                        print(f"  -> Conflicto detectado para imagen '{filename}'. Renombrando a '{os.path.basename(ruta_imagen_destino)}'")
+                        print(f"  -> Conflict detected for image '{filename}'. Renaming to '{os.path.basename(ruta_imagen_destino)}'")
                     
                     shutil.copy2(ruta_archivo_original, ruta_imagen_destino)
                     imagenes_copiadas += 1
-                    print(f"  -> Imagen copiada: {filename} (carpeta imagenes_{carpeta_imagenes_actual})")
+                    print(f"  -> Image copied: {filename} (folder imagenes_{carpeta_imagenes_actual})")
                     
                 except Exception as e:
                     print(f"  !! Error al copiar imagen {ruta_archivo_original}: {e}")
                 
                 continue
             
-            # 6. Verificar número de palabras del archivo (solo para archivos no-imagen)
+            # 6. Check file word count (only for non-image files)
             if not verificar_palabras_archivo(ruta_archivo_original):
                 continue
             
-            # 7. Crear nueva carpeta si se alcanzó el límite de archivos
+            # 7. Create new folder if file limit is reached
             if archivos_copiados > 0 and archivos_copiados % MAX_FILES_PER_FOLDER == 0:
                 carpeta_actual += 1
                 directorio_destino_actual = os.path.join(destino, f"carpeta_{carpeta_actual}")
@@ -414,92 +411,194 @@ def aplanar_directorio(origen, destino):
                     print(f"Creando nueva carpeta: {directorio_destino_actual}")
                     os.makedirs(directorio_destino_actual)
             
-            # Convertir la extensión si no está permitida
+            # Convert extension if not allowed
             filename_convertido = convertir_extension_a_txt(filename)
             
-            # Construir la ruta tentativa en el destino
+            # Build tentative path in destination
             ruta_archivo_destino = os.path.join(directorio_destino_actual, filename_convertido)
             
-            # Procesar contenido especial según el tipo de archivo
+            # Process special content according to file type
             contenido_limpio = None
             
-            # Si es un archivo .sh convertido a .md, limpiar el shebang
+            # If it's a .sh file converted to .md, clean the shebang
             if filename_convertido.endswith('.md') and (filename.endswith('.sh') or filename.endswith('.bash')):
                 contenido_limpio = limpiar_shebang_shell(ruta_archivo_original)
                 if contenido_limpio is not None:
-                    print(f"  -> Shebang eliminado de: {filename}")
+                    print(f"  -> Shebang removed from: {filename}")
             
            
             
-            # 8. Manejo de conflictos: verificar si ya existe un archivo con ese nombre.
+            # 8. Conflict handling: check if a file with that name already exists.
             contador = 1
             nombre_base, extension = os.path.splitext(filename_convertido)
             
             while os.path.exists(ruta_archivo_destino):
-                # Si existe, crea un nuevo nombre con un sufijo numérico
+                # If it exists, create a new name with a numeric suffix
                 nuevo_nombre = f"{nombre_base}_{contador}{extension}"
                 ruta_archivo_destino = os.path.join(directorio_destino_actual, nuevo_nombre)
                 contador += 1
 
-            # 9. Copiar el archivo (ya sea con su nombre original o el nuevo nombre).
+            # 9. Copy the file (either with its original name or the new name).
             try:
-                # Mostrar información sobre conflictos de nombres
+                # Show information about name conflicts
                 if ruta_archivo_destino != os.path.join(directorio_destino_actual, filename_convertido):
-                    print(f"  -> Conflicto detectado para '{filename_convertido}'. Renombrando a '{os.path.basename(ruta_archivo_destino)}'")
+                    print(f"  -> Conflict detected for '{filename_convertido}'. Renaming to '{os.path.basename(ruta_archivo_destino)}'")
                 
-                # Si tenemos contenido limpio (sin shebang o sin tags XML), escribirlo directamente
+                # If we have clean content (without shebang or XML tags), write it directly
                 if contenido_limpio is not None:
                     with open(ruta_archivo_destino, 'w', encoding='utf-8') as archivo_destino:
                         archivo_destino.write(contenido_limpio)
                 else:
-                    # Copiar archivo normalmente
+                    # Copy file normally
                     shutil.copy2(ruta_archivo_original, ruta_archivo_destino)
                 
                 archivos_copiados += 1
                 
-                # Mostrar progreso cada 50 archivos
+                # Show progress every 50 files
                 if archivos_copiados % 50 == 0:
-                    print(f"  -> Progreso: {archivos_copiados} archivos copiados")
+                    print(f"  -> Progress: {archivos_copiados} files copied")
                     
             except Exception as e:
                 print(f"  !! Error al copiar {ruta_archivo_original}: {e}")
 
-    print(f"\n¡Proceso completado!")
-    print(f"Total de archivos copiados: {archivos_copiados}")
-    print(f"Total de imágenes copiadas: {imagenes_copiadas}")
-    print(f"Total de carpetas de archivos creadas: {carpeta_actual}")
-    print(f"Total de carpetas de imágenes creadas: {carpeta_imagenes_actual}")
+    print(f"\nProcess completed!")
+    print(f"Total files copied: {archivos_copiados}")
+    print(f"Total images copied: {imagenes_copiadas}")
+    print(f"Total file folders created: {carpeta_actual}")
+    print(f"Total image folders created: {carpeta_imagenes_actual}")
     
     if carpeta_actual > 1:
-        print(f"Carpetas de archivos: {destino} (carpeta principal) y {carpeta_actual - 1} carpetas adicionales (carpeta_2 hasta carpeta_{carpeta_actual})")
+        print(f"File folders: {destino} (main folder) and {carpeta_actual - 1} additional folders (carpeta_2 to carpeta_{carpeta_actual})")
     else:
-        print(f"Todos los archivos se copiaron en: {destino}")
+        print(f"All files were copied to: {destino}")
     
     if carpeta_imagenes_actual > 1:
-        print(f"Carpetas de imágenes: imagenes_1 hasta imagenes_{carpeta_imagenes_actual} (máximo {MAX_IMAGENES_PER_FOLDER} imágenes por carpeta)")
+        print(f"Image folders: imagenes_1 to imagenes_{carpeta_imagenes_actual} (maximum {MAX_IMAGENES_PER_FOLDER} images per folder)")
     else:
-        print(f"Imágenes copiadas en: imagenes_1")
+        print(f"Images copied to: imagenes_1")
     
-    # Eliminar archivos vacíos después del proceso
+    # Remove empty files after the process
     eliminar_archivos_vacios(destino)
 
 
-# --- Ejecutar la función ---
+def mostrar_ayuda():
+    """
+    Shows the script help information.
+    """
+    print("""
+Flatten Directory - File Reorganization Script
+
+USAGE:
+    python aplanar_directorio.py [OPTIONS] [SOURCE] [DESTINATION]
+
+OPTIONS:
+    -h, --help              Show this help
+    --eliminar-vacios       Only remove empty files from destination directory
+
+PARAMETERS:
+    SOURCE                  Path to source directory (optional, uses default value if not specified)
+    DESTINATION             Path to destination directory (optional, uses default value if not specified)
+
+EXAMPLES:
+    # Use default paths
+    python aplanar_directorio.py
+    
+    # Specify only source
+    python aplanar_directorio.py /path/source
+    
+    # Specify source and destination
+    python aplanar_directorio.py /path/source /path/destination
+    
+    # Only remove empty files
+    python aplanar_directorio.py --eliminar-vacios /path/destination
+    
+    # Show help
+    python aplanar_directorio.py --help
+
+NOTES:
+    - If SOURCE is not specified, uses: {ruta_origen_default}
+    - If DESTINATION is not specified, uses: {ruta_destino_default}
+    - Source and destination paths must be different
+    - The destination directory will be created automatically if it doesn't exist
+    """.format(
+        ruta_origen_default=ruta_origen_default,
+        ruta_destino_default=ruta_destino_default
+    ))
+
+
+def parsear_argumentos():
+    """
+    Parses command line arguments and returns paths and options.
+    """
+    import sys
+    
+    # Default values
+    origen = ruta_origen_default
+    destino = ruta_destino_default
+    solo_eliminar_vacios = False
+    directorio_eliminar_vacios = None
+    
+    # Counter to track how many path parameters we have processed
+    parametros_ruta = 0
+    
+    # Process arguments
+    i = 1
+    while i < len(sys.argv):
+        arg = sys.argv[i]
+        
+        if arg in ['-h', '--help']:
+            mostrar_ayuda()
+            sys.exit(0)
+        elif arg == '--eliminar-vacios':
+            solo_eliminar_vacios = True
+            # The next argument should be the destination directory
+            if i + 1 < len(sys.argv) and not sys.argv[i + 1].startswith('-'):
+                directorio_eliminar_vacios = sys.argv[i + 1]
+                i += 1
+            else:
+                directorio_eliminar_vacios = destino
+        elif not arg.startswith('-'):
+            # It's a path parameter
+            if parametros_ruta == 0:
+                origen = arg
+                parametros_ruta += 1
+            elif parametros_ruta == 1:
+                destino = arg
+                parametros_ruta += 1
+            else:
+                print(f"Error: Too many parameters. Unexpected argument: {arg}")
+                print("Use --help to see help.")
+                sys.exit(1)
+        else:
+            print(f"Error: Unknown option: {arg}")
+            print("Use --help to see help.")
+            sys.exit(1)
+        
+        i += 1
+    
+    return origen, destino, solo_eliminar_vacios, directorio_eliminar_vacios
+
+
+# --- Execute the function ---
 if __name__ == "__main__":
     import sys
     
-    # Verificar si se quiere solo eliminar archivos vacíos
-    if len(sys.argv) > 1 and sys.argv[1] == "--eliminar-vacios":
-        print("Modo: Solo eliminar archivos vacíos")
-        if os.path.isdir(ruta_destino):
-            eliminar_archivos_vacios(ruta_destino)
+    # Parse command line arguments
+    ruta_origen, ruta_destino, solo_eliminar_vacios, directorio_eliminar_vacios = parsear_argumentos()
+    
+    # Check if we only want to remove empty files
+    if solo_eliminar_vacios:
+        print("Mode: Only remove empty files")
+        directorio_a_limpiar = directorio_eliminar_vacios or ruta_destino
+        if os.path.isdir(directorio_a_limpiar):
+            eliminar_archivos_vacios(directorio_a_limpiar)
         else:
-            print(f"Error: La ruta de destino '{ruta_destino}' no existe.")
+            print(f"Error: The destination path '{directorio_a_limpiar}' does not exist.")
     else:
-        # Validaciones básicas para el proceso normal
+        # Basic validations for normal process
         if not os.path.isdir(ruta_origen):
-            print(f"Error: La ruta de origen '{ruta_origen}' no existe o no es un directorio.")
+            print(f"Error: The source path '{ruta_origen}' does not exist or is not a directory.")
         elif ruta_origen == ruta_destino:
-             print("Error: La ruta de origen y destino no pueden ser la misma.")
+             print("Error: Source and destination paths cannot be the same.")
         else:
             aplanar_directorio(ruta_origen, ruta_destino)
