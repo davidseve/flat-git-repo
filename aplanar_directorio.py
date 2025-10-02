@@ -573,14 +573,14 @@ OPTIONS:
 
 PARAMETERS:
     SOURCE                  Path to source directory (optional, uses default value if not specified)
-    DESTINATION             Path to destination directory (optional, uses default value if not specified)
+    DESTINATION             Path to destination directory (optional, auto-generated from SOURCE with "-flat" suffix if not specified)
     GIT_REPO                Git repository URL (optional, requires --git-clone option)
 
 EXAMPLES:
     # Use default paths
     python aplanar_directorio.py
     
-    # Specify only source
+    # Specify only source (destination auto-generated as "source-flat")
     python aplanar_directorio.py /path/source
     
     # Specify source and destination
@@ -606,7 +606,8 @@ GIT INTEGRATION:
 
 NOTES:
     - If SOURCE is not specified, uses: {ruta_origen_default}
-    - If DESTINATION is not specified, uses: {ruta_destino_default}
+    - If DESTINATION is not specified, auto-generates from SOURCE with "-flat" suffix
+    - If both SOURCE and DESTINATION are not specified, uses default values
     - Source and destination paths must be different
     - The destination directory will be created automatically if it doesn't exist
     - Git repository will be cloned to a temporary directory when using --git-clone
@@ -673,6 +674,14 @@ def parsear_argumentos():
             sys.exit(1)
         
         i += 1
+    
+    # If destination is not provided, generate it automatically based on source
+    if parametros_ruta == 1:  # Only source was provided
+        # Get the base name of the source directory
+        origen_base = os.path.basename(os.path.abspath(origen))
+        # Generate destination path with "-flat" suffix
+        destino = os.path.join(os.path.dirname(os.path.abspath(origen)), f"{origen_base}-flat")
+        print(f"Auto-generated destination path: {destino}")
     
     return origen, destino, git_repo, solo_eliminar_vacios, directorio_eliminar_vacios, usar_git_clone
 
