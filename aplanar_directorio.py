@@ -53,7 +53,7 @@ def es_archivo_excluido(extension):
     """
     Checks if the file extension should be excluded from processing.
     """
-    extensiones_excluidas = {'ttf', 'otf', 'woff', 'woff2', 'eot', 'jar', 'war', 'zip', 'tar', 'gz', 'bz2', 'rar', '7z'}  # Fonts
+    extensiones_excluidas = {'ttf', 'otf', 'woff', 'woff2', 'eot', 'jar', 'war', 'zip', 'tar', 'gz', 'bz2', 'rar', '7z', 'ear'}  # Fonts
     return extension.lower().lstrip('.') in extensiones_excluidas
 
 
